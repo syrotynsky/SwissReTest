@@ -8,15 +8,16 @@ public class CoffeeShop
 {
 	private static final String BEVERAGE = "beverage.";
 	private static final String SNACK = "snack.";
-	private static final String EXTRAS = "extras.";
+	private static final String EXTRA = "extras.";
 
 	private static final Set<String> BEVERAGES = new HashSet<>();
 	private static final Set<String> SNACKS = new HashSet<>();
+	private static final Set<String> EXTRAS = new HashSet<>();
 	private static final Map<String, Double> MENU_PRICES = new HashMap<>();
-	private static final Map<String, Double> EXTRAS_PRICES = new HashMap<>();
 
 	private static final Locale swissLocale = new Locale("de", "CH");
 	private static final NumberFormat currencyFormat = NumberFormat.getCurrencyInstance(swissLocale);
+	static final List<String> shoppingList = new ArrayList<>();
 
 	static
 	{
@@ -30,24 +31,55 @@ public class CoffeeShop
 		System.out.println("Welcome to the Coffee Shop!");
 		System.out.println("Please enter your order comma separated (e.g., 'large coffee with extra milk, bacon roll'):");
 
-		List<String> shoppingList = parseOrderInput(scanner.nextLine());
+		do
+		{
+			try
+			{
+				parseOrderInput(scanner.nextLine());
+			}
+			catch (IllegalArgumentException e)
+			{
+				shoppingList.clear();
+				System.out.println("You entered wrong item, try again: ");
+			}
+		}
+		while (shoppingList.isEmpty());
 
-		double totalCost = calculateTotalCost(shoppingList);
+		double totalCost = calculateTotalCost();
 		System.out.println(generateReceipt(shoppingList, totalCost));
 	}
 
-	static List<String> parseOrderInput(String input)
+	static void parseOrderInput(String input)
 	{
-		List<String> orderItems = new ArrayList<>();
 		String[] items = input.split(",");
 		for (String item : items)
 		{
-			orderItems.add(item.trim().toLowerCase());
+			String cleanedItem = item.trim().toLowerCase();
+
+			if(!isValidItem(cleanedItem))
+			{
+				throw new IllegalArgumentException("Invalid item: " + cleanedItem);
+			}
 		}
-		return orderItems;
 	}
 
-	static double calculateTotalCost(List<String> shoppingList)
+	static boolean isValidItem(String item)
+	{
+		String[] parts = item.split(" with ");
+		String product = parts[0].toLowerCase();
+		String extra = (parts.length > 1) ? parts[1].toLowerCase() : null;
+
+		shoppingList.add(product);
+		if (extra == null)
+		{
+			return MENU_PRICES.containsKey(product);
+		}
+
+		shoppingList.add(extra);
+		return MENU_PRICES.containsKey(product) && MENU_PRICES.containsKey(extra);
+	}
+
+	static double calculateTotalCost()
 	{
 		int beverageCount = 0;
 		int snackCount = 0;
@@ -56,37 +88,25 @@ public class CoffeeShop
 
 		for (String item : shoppingList)
 		{
-			String[] parts = item.split(" with ");
-			String product = parts[0].toLowerCase();
-			String extra = (parts.length > 1) ? parts[1].toLowerCase() : null;
+			totalCost += MENU_PRICES.get(item);
 
-			if (MENU_PRICES.containsKey(product))
+			if (BEVERAGES.contains(item))
 			{
-				totalCost += MENU_PRICES.get(product);
+				beverageCount++;
 
-				// Check if the item is a beverage
-				if (BEVERAGES.contains(product))
+				// Check if the customer is eligible for a free beverage
+				if (beverageCount % 5 == 0)
 				{
-					beverageCount++;
-
-					// Check if the customer is eligible for a free beverage
-					if (beverageCount % 5 == 0)
-					{
-						totalCost -= MENU_PRICES.get(product);
-					}
-				}
-				// Check if the customer gets a free extra with a snack
-				if (SNACKS.contains(product))
-				{
-					snackCount++;
+					totalCost -= MENU_PRICES.get(item);
 				}
 			}
-
-			// Add extra cost for selected extras
-			if (extra != null && EXTRAS_PRICES.containsKey(extra))
+			else if (SNACKS.contains(item))
 			{
-				totalCost += EXTRAS_PRICES.get(extra);
-				extraPrice = EXTRAS_PRICES.get(extra);
+				snackCount++;
+			}
+			else if (EXTRAS.contains(item))
+			{
+				extraPrice = MENU_PRICES.get(item);
 			}
 		}
 
@@ -143,13 +163,14 @@ public class CoffeeShop
 					MENU_PRICES.put(snack, Double.parseDouble(value));
 					SNACKS.add(snack);
 				}
-				else if (key.startsWith(EXTRAS))
+				else if (key.startsWith(EXTRA))
 				{
-					EXTRAS_PRICES.put(key.substring(EXTRAS.length()).replace("_", " "), Double.parseDouble(value));
+					String extra = key.substring(EXTRA.length()).replace("_", " ");
+					MENU_PRICES.put(extra, Double.parseDouble(value));
+					EXTRAS.add(extra);
 				}
 			}
-		}
-		catch (Exception e)
+		} catch (Exception e)
 		{
 			e.printStackTrace();
 		}
